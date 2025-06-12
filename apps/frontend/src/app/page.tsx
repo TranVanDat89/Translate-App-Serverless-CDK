@@ -1,7 +1,7 @@
 "use client"
 
 import { useState } from "react";
-import { ITranslateRequest, ITranslateResponse, ITranslateDBObject } from "@ohana/shared_types";
+import { ITranslateRequest, ITranslateDBObject, ITranslateResponse } from "@ohana/shared_types";
 
 const URL = process.env.NEXT_PUBLIC_BASE_URL;
 
@@ -31,7 +31,7 @@ async function translateText({ sourceLang, targetLang, sourceText }: ITranslateR
   }
 }
 
-export const getTranslations = async () => {
+const getTranslations = async () => {
   try {
     const result = await fetch(URL!, {
       method: "GET",
@@ -39,7 +39,7 @@ export const getTranslations = async () => {
 
     const response = (await result.json()) as Array<ITranslateDBObject>;
     return response;
-  } catch (error: any) {
+  } catch (error) {
     console.error("Get All Translations Error:", error);
     throw error;
   }
@@ -49,7 +49,7 @@ export default function Home() {
   const [inputText, setInputText] = useState<string>("")
   const [inputLang, setInputLang] = useState<string>("")
   const [outputLang, setOutputLang] = useState<string>("")
-  const [outputText, setOutputText] = useState<any>(null)
+  const [outputText, setOutputText] = useState<ITranslateResponse>({timestamp: "", targetText: ""})
   const [translations, setTranslations] = useState<Array<ITranslateDBObject>>(
     []
   );
@@ -103,7 +103,7 @@ export default function Home() {
           <p>Result:</p>
           <pre>
             {translations.map((item) => (
-              <div>
+              <div key={item.requestId}>
                 <p>
                   {item.sourceLang}/{item.sourceText}
                 </p>

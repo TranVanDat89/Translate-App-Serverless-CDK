@@ -6,6 +6,10 @@ import * as lambda from "aws-cdk-lib/aws-lambda";
 import * as apigateway from "aws-cdk-lib/aws-apigateway";
 import * as dynamodb from "aws-cdk-lib/aws-dynamodb";
 import * as path from "path";
+import * as s3 from "aws-cdk-lib/aws-s3";
+import * as s3Deploy from "aws-cdk-lib/aws-s3-deployment";
+import * as cloudfront from "aws-cdk-lib/aws-cloudfront";
+import * as origins from 'aws-cdk-lib/aws-cloudfront-origins';
 
 export class InfrastructureStack extends cdk.Stack {
   private readonly table: dynamodb.Table;
@@ -26,6 +30,36 @@ export class InfrastructureStack extends cdk.Stack {
 
     // Setup API Gateway routes
     this.setupAPIRoutes(translationLambda, getAllTranslationsLambda);
+
+    // Create S3 Bucket And Deploy Static Web
+    const s3Bucket = this.createS3Bucket();
+    // Create CloudFront
+    const distribution = this.createCloudFront(s3Bucket);
+    this.deployStaticWeb(s3Bucket, distribution);
+
+    // Print domain name
+    new cdk.CfnOutput(this, "WebUrl", {
+      exportName: "WebUrl",
+      value: `https://${distribution.distributionDomainName}`
+    })
+  }
+
+  private createCloudFront(s3Bucket: s3.Bucket): cloudfront.Distribution {
+    return new cloudfront.Distribution(this, "WebDistribution", {
+      defaultBehavior: {
+        origin: new origins.S3StaticWebsiteOrigin(s3Bucket),
+        viewerProtocolPolicy: cloudfront.ViewerProtocolPolicy.REDIRECT_TO_HTTPS,
+      },
+      defaultRootObject: 'index.html',
+      errorResponses: [
+        {
+          httpStatus: 404,
+          responseHttpStatus: 404,
+          responsePagePath: '/404.html',
+          ttl: cdk.Duration.minutes(30),
+        },
+      ]
+    });
   }
 
   private createLambdaLayer(): lambda.LayerVersion {
@@ -47,6 +81,33 @@ export class InfrastructureStack extends cdk.Stack {
         type: dynamodb.AttributeType.STRING
       },
       removalPolicy: cdk.RemovalPolicy.DESTROY
+    });
+  }
+
+  private createS3Bucket(): s3.Bucket {
+    return new s3.Bucket(this, "BucketDeployedWebsite", {
+      websiteIndexDocument: "index.html",
+      websiteErrorDocument: "404.html",
+      blockPublicAccess: {
+        blockPublicAcls: false,
+        blockPublicPolicy: false,
+        ignorePublicAcls: false,
+        restrictPublicBuckets: false
+      },
+      removalPolicy: cdk.RemovalPolicy.DESTROY,
+      autoDeleteObjects: true,
+      publicReadAccess: true,
+    });
+  }
+
+  private deployStaticWeb(s3Bucket: s3.Bucket, distribution:cloudfront.Distribution): s3Deploy.BucketDeployment {
+    const projectRoot = "../";
+    const staticWebDir = path.resolve(projectRoot, "apps/frontend/dist");
+    return new s3Deploy.BucketDeployment(this, "WebsiteDeployment", {
+      destinationBucket: s3Bucket,
+      sources: [s3Deploy.Source.asset(staticWebDir)],
+      distribution: distribution,
+      distributionPaths: ["/*"]
     });
   }
 

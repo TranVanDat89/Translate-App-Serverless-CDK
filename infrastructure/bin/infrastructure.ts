@@ -1,6 +1,9 @@
 #!/usr/bin/env node
 import * as cdk from 'aws-cdk-lib';
 import { InfrastructureStack } from '../lib/infrastructure-stack';
+import * as dotenv from 'dotenv';
+
+dotenv.config();
 
 const app = new cdk.App();
 new InfrastructureStack(app, 'InfrastructureStack', {
@@ -17,7 +20,10 @@ new InfrastructureStack(app, 'InfrastructureStack', {
   // env: { account: '123456789012', region: 'us-east-1' },
 
   /* For more information, see https://docs.aws.amazon.com/cdk/latest/guide/environments.html */
+  // Bắt buộc phải là us-east-1 cho ACM certificate với CloudFront
   env: {
     region: process.env.REGION
-  }
+  },
+  domainName: process.env.DOMAIN_NAME!,
+  hostedZoneId: process.env.HOSTED_ZONE_ID!
 });

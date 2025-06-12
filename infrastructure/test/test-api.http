@@ -1,6 +1,6 @@
 
 // enter your API Gateway URL
-@URL=https://82h7qjdlq7.execute-api.ap-southeast-2.amazonaws.com/prod/
+@URL=https://api.tranvandat-deploy.click
 
 POST {{URL}} HTTP/1.1
 Content-Type: application/json
@@ -8,7 +8,7 @@ Accept: "application/json"
 
 {
   "sourceLang": "en",
-  "targetLang": "vi",
+  "targetLang": "ja",
   "sourceText": "Fuck You, Just Joke, I Test Transaltion Service."
 }
 

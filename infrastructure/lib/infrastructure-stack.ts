@@ -10,46 +10,147 @@ import * as s3 from "aws-cdk-lib/aws-s3";
 import * as s3Deploy from "aws-cdk-lib/aws-s3-deployment";
 import * as cloudfront from "aws-cdk-lib/aws-cloudfront";
 import * as origins from 'aws-cdk-lib/aws-cloudfront-origins';
+import * as route53 from 'aws-cdk-lib/aws-route53';
+import * as targets from 'aws-cdk-lib/aws-route53-targets';
+import * as acm from 'aws-cdk-lib/aws-certificatemanager';
+
+export interface InfrastructureStackProps extends cdk.StackProps {
+  domainName: string;
+  hostedZoneId: string;
+}
 
 export class InfrastructureStack extends cdk.Stack {
   private readonly table: dynamodb.Table;
   private readonly lambdaLayer: lambda.LayerVersion;
   private readonly restAPI: apigateway.RestApi;
+  private readonly domainName: string;
+  private readonly hostedZone: route53.IHostedZone;
 
-  constructor(scope: Construct, id: string, props?: cdk.StackProps) {
+  constructor(scope: Construct, id: string, props: InfrastructureStackProps) {
     super(scope, id, props);
+
+    // Validate required props
+    if (!props.domainName) {
+      throw new Error('domainName is required');
+    }
+    if (!props.hostedZoneId) {
+      throw new Error('hostedZoneId is required');
+    }
+
+    this.domainName = props.domainName;
+    this.hostedZone = route53.HostedZone.fromHostedZoneAttributes(this, 'HostedZone', {
+      hostedZoneId: props.hostedZoneId,
+      zoneName: this.domainName,
+    });
 
     // Initialize core resources
     this.lambdaLayer = this.createLambdaLayer();
     this.table = this.createDynamoDBTable();
-    this.restAPI = this.createRestAPI();
+
+    // Create SSL Certificate
+    const certificate = this.createSSLCertificate();
 
     // Create Lambda functions
     const translationLambda = this.createTranslationLambda();
     const getAllTranslationsLambda = this.createGetAllTranslationsLambda();
+
+    // Create API Gateway with custom domain
+    this.restAPI = this.createRestAPI(certificate);
+    const apiDomain = this.createAPIGatewayDomain(certificate);
 
     // Setup API Gateway routes
     this.setupAPIRoutes(translationLambda, getAllTranslationsLambda);
 
     // Create S3 Bucket And Deploy Static Web
     const s3Bucket = this.createS3Bucket();
-    // Create CloudFront
-    const distribution = this.createCloudFront(s3Bucket);
+    
+    // Create CloudFront with custom domain
+    const distribution = this.createCloudFront(s3Bucket, certificate);
     this.deployStaticWeb(s3Bucket, distribution);
 
-    // Print domain name
+    // Create Route53 records
+    this.createRoute53Records(distribution, apiDomain);
+
+    // Print domain names
     new cdk.CfnOutput(this, "WebUrl", {
       exportName: "WebUrl",
-      value: `https://${distribution.distributionDomainName}`
-    })
+      value: `https://${this.domainName}`
+    });
+
+    new cdk.CfnOutput(this, "ApiUrl", {
+      exportName: "ApiUrl",
+      value: `https://api.${this.domainName}`
+    });
   }
 
-  private createCloudFront(s3Bucket: s3.Bucket): cloudfront.Distribution {
+  private createSSLCertificate(): acm.Certificate {
+    return new acm.Certificate(this, 'Certificate', {
+      domainName: this.domainName,
+      subjectAlternativeNames: [`*.${this.domainName}`],
+      validation: acm.CertificateValidation.fromDns(this.hostedZone),
+    });
+  }
+
+  private createAPIGatewayDomain(certificate: acm.Certificate): apigateway.DomainName {
+    const apiDomainName = `api.${this.domainName}`;
+    
+    return new apigateway.DomainName(this, 'ApiDomain', {
+      domainName: apiDomainName,
+      certificate: certificate,
+      endpointType: apigateway.EndpointType.EDGE,
+      mapping: this.restAPI,
+    });
+  }
+
+  private createRoute53Records(
+    distribution: cloudfront.Distribution,
+    apiDomain: apigateway.DomainName
+  ): void {
+    // A record for main domain pointing to CloudFront
+    new route53.ARecord(this, 'WebsiteARecord', {
+      zone: this.hostedZone,
+      recordName: this.domainName,
+      target: route53.RecordTarget.fromAlias(
+        new targets.CloudFrontTarget(distribution)
+      ),
+    });
+
+    // AAAA record for main domain pointing to CloudFront (IPv6)
+    new route53.AaaaRecord(this, 'WebsiteAAAARecord', {
+      zone: this.hostedZone,
+      recordName: this.domainName,
+      target: route53.RecordTarget.fromAlias(
+        new targets.CloudFrontTarget(distribution)
+      ),
+    });
+
+    // A record for API subdomain pointing to API Gateway
+    new route53.ARecord(this, 'ApiARecord', {
+      zone: this.hostedZone,
+      recordName: `api.${this.domainName}`,
+      target: route53.RecordTarget.fromAlias(
+        new targets.ApiGatewayDomain(apiDomain)
+      ),
+    });
+
+    // AAAA record for API subdomain pointing to API Gateway (IPv6)
+    new route53.AaaaRecord(this, 'ApiAAAARecord', {
+      zone: this.hostedZone,
+      recordName: `api.${this.domainName}`,
+      target: route53.RecordTarget.fromAlias(
+        new targets.ApiGatewayDomain(apiDomain)
+      ),
+    });
+  }
+
+  private createCloudFront(s3Bucket: s3.Bucket, certificate: acm.Certificate): cloudfront.Distribution {
     return new cloudfront.Distribution(this, "WebDistribution", {
       defaultBehavior: {
         origin: new origins.S3StaticWebsiteOrigin(s3Bucket),
         viewerProtocolPolicy: cloudfront.ViewerProtocolPolicy.REDIRECT_TO_HTTPS,
       },
+      domainNames: [this.domainName],
+      certificate: certificate,
       defaultRootObject: 'index.html',
       errorResponses: [
         {
@@ -100,7 +201,7 @@ export class InfrastructureStack extends cdk.Stack {
     });
   }
 
-  private deployStaticWeb(s3Bucket: s3.Bucket, distribution:cloudfront.Distribution): s3Deploy.BucketDeployment {
+  private deployStaticWeb(s3Bucket: s3.Bucket, distribution: cloudfront.Distribution): s3Deploy.BucketDeployment {
     const projectRoot = "../";
     const staticWebDir = path.resolve(projectRoot, "apps/frontend/dist");
     return new s3Deploy.BucketDeployment(this, "WebsiteDeployment", {
@@ -111,12 +212,16 @@ export class InfrastructureStack extends cdk.Stack {
     });
   }
 
-  private createRestAPI(): apigateway.RestApi {
+  private createRestAPI(certificate: acm.Certificate): apigateway.RestApi {
     return new apigateway.RestApi(this, "translationAPI", {
       defaultCorsPreflightOptions: {
         allowOrigins: apigateway.Cors.ALL_ORIGINS,
         allowMethods: apigateway.Cors.ALL_METHODS,
       },
+      domainName: {
+        domainName: this.domainName,
+        certificate
+      }
     });
   }
 

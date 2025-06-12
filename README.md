@@ -76,3 +76,7 @@ Cơ chế đảm bảo khi người dùng thực hiện cùng 1 request nhiều 
 
 Thực hiện: Gửi kèm một Unique Imdempotency Key, kiểm tra đã thực hiện request với Idempotency Key đó chưa.
  
+### CHú ý
+Sau mỗi lần thay đổi region, cần phải chạy lại lệnh cdk bootstrap
+Đối với Lambda cần có Docker để deploy
+CloudFront phải chuyển region sang us-east-1

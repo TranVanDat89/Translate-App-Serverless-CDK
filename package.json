@@ -1,0 +1,27 @@
+{
+  "name": "translate-app-serverless-aws",
+  "version": "1.0.0",
+  "description": "Translate App Using AWS Lambda, API Gateway, DynamoDB, NextJS.",
+  "license": "ISC",
+  "scripts": {
+    "frontend": "npm run dev --workspace=@ohana/frontend",
+    "build:layers": "npm run build --workspace=@ohana/lambda-layers && npm run create-layer-structure --workspace=@ohana/lambda-layers",
+    "clean": "npm run clean --workspaces --if-present",
+    "deploy:infra":"npm run deploy --workspace=@ohana/infrastructure",
+    "deploy": "npm run build:layers && npm run deploy:infra && npm run frontend",
+    "destroy": "npm run destroy --workspace=@ohana/infrastructure",
+    "synth": "npm run synth --workspace=@ohana/infrastructure",
+    "bootstrap": "npm run bootstrap --workspace=@ohana/infrastructure",
+    "watch:layers": "npm run watch --workspace=@ohana/lambda-layers",
+    "type-check": "npm run type-check --workspaces --if-present"
+  },
+  "workspaces": [
+    "apps/*",
+    "infrastructure",
+    "packages/*"
+  ],
+  "devDependencies": {
+    "concurrently": "9.1.2",
+    "rimraf": "^6.0.1"
+  }
+}

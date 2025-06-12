@@ -1,0 +1,7 @@
+{
+  "name": "@ohana/shared_types",
+  "version": "1.0.0",
+  "description": "",
+  "license": "ISC",
+  "types": "./src/index.d.ts"
+}

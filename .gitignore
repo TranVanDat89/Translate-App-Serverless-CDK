@@ -1,0 +1,50 @@
+# Root .gitignore for monorepo
+
+# Node modules (hoisted or local)
+node_modules/
+**/node_modules/
+
+# Build output
+dist/
+build/
+out/
+cdk.out/
+
+# Logs
+npm-debug.log*
+pnpm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+logs/
+
+# OS-specific
+.DS_Store
+Thumbs.db
+
+# Environment variables
+.env
+.env.*
+
+# IDEs
+.vscode/
+.idea/
+
+# TypeScript
+*.tsbuildinfo
+
+# Next.js
+.next/
+out/
+
+# CDK context
+cdk.context.json
+
+# Coverage reports
+coverage/
+
+# Dependency symlinks if using pnpm
+.pnpm/
+
+# Misc
+*.log
+*.swp

@@ -2,9 +2,10 @@
 import * as cdk from 'aws-cdk-lib';
 import { Construct } from 'constructs';
 import * as route53 from 'aws-cdk-lib/aws-route53';
+import { writeAuthConfigToFile } from "../helpers";
 
 // Import constructs
-import {ApiGateway, Certificate, Database, Frontend, Dns, LambdaStack} from "../constructs";
+import {ApiGateway, Certificate, Database, Frontend, Dns, LambdaStack, Cognito} from "../constructs";
 
 export interface InfrastructureStackProps extends cdk.StackProps {
   domainName: string;
@@ -36,6 +37,13 @@ export class InfrastructureStack extends cdk.Stack {
     const certificate = new Certificate(this, 'Certificate', {
       domainName: this.domainName,
       hostedZone: this.hostedZone,
+    });
+
+    // Cognito
+    const cognito = new Cognito(this, 'Cognito');
+    writeAuthConfigToFile({
+      userPoolId: cognito.userPool.userPoolId,
+      userPoolClientId: cognito.userPoolClient.userPoolClientId
     });
 
     const database = new Database(this, 'Database');

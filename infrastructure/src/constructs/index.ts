@@ -4,3 +4,4 @@ export * from "./dns";
 export * from "./dynamodb";
 export * from "./frontend";
 export * from "./lambda";
+export * from "./cognito";

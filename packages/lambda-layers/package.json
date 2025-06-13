@@ -8,13 +8,20 @@
   "types": "dist/index.d.ts",
   "scripts": {
     "build": "tsc",
+    "watch": "tsc --watch",
     "clean": "rimraf dist nodejs",
     "package": "npm run build && npm run create-layer-structure",
     "create-layer-structure": "npx ts-node create-layer.ts"
   },
   "devDependencies": {
+    "@aws-sdk/client-dynamodb": "^3.828.0",
+    "@aws-sdk/client-translate": "^3.828.0",
+    "@aws-sdk/util-dynamodb": "^3.828.0",
     "@types/aws-lambda": "^8.10.149",
     "@types/node": "^22.15.31",
     "ts-node": "^10.9.2"
+  },
+  "dependencies": {
+    "@ohana/shared_types": "^1.0.0"
   }
 }

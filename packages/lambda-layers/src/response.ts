@@ -22,3 +22,8 @@ export const createErrorJSONResponse = (body:object) => createResponse({
     statusCode: 500,
     body: JSON.stringify(body)
 });
+
+export const createNotFoundJSONResponse = (body: object) => createResponse({
+    statusCode: 404,
+    body: JSON.stringify(body)
+})
